@@ -1,0 +1,15 @@
+graph "PoT_clone" {
+	layout=dot;
+	rankdir=TB;
+	splines=false;
+	newrank=true;
+	{ rank=same; s4n; }
+	{ rank=same; m3_0; }
+
+	s4n [shape=circle];
+	m3_0 [shape=circle];
+
+	m3_0 -- s4n;
+
+	// Contraintes d'alignement vertical par groupe
+}

@@ -10,45 +10,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include "Graph.h"
 
 #define BUFFER_SIZE 256
 
-/* ---------- Structures de base ---------- */
-
-typedef struct _vertex {
-    char* name;
-} Vertex;
-
-typedef struct _edge {
-    char* name;
-    Vertex* endpoints[2];   // pointeurs vers les vrais sommets du graphe
-} Edge;
-
-/* Liste d'adjacence : tableau dynamique de pointeurs d'arêtes */
-typedef struct {
-    Edge** edges;
-    int size;
-    int capacity;
-} AdjList;
-
-/* Structure principale du graphe */
-typedef struct _graph {
-    char* name;
-    int nbvMAX;
-    int nbv;                // nombre actuel de sommets
-    Vertex** vertices;      // tableau de pointeurs de sommets (taille nbvMAX)
-    int nbeMAX;
-    int nbe;                // nombre actuel d'arêtes
-    Edge** edges;           // tableau de pointeurs d'arêtes (taille nbeMAX)
-    AdjList* adj;           // adj[i] = liste d'adjacence du sommet i
-} Graph;
-
-/* Structure retournée par getIssuedEdges (compatible avec l'original) */
-typedef struct {
-    Vertex* v;
-    Edge** issuedEdges;
-    int size;
-} IssuedEdges;
 
 /* ---------- Création des éléments ---------- */
 
@@ -116,16 +81,16 @@ int addVertex(Graph* g, Vertex* v) {
     g->adj[g->nbv].edges = NULL;   // sera initialisé au premier ajout d'arête
     g->adj[g->nbv].size = 0;
     g->adj[g->nbv].capacity = 0;
+    v->id = g->nbv;
     g->nbv++;
     return 1;
 }
 
 /* Trouve l'index d'un sommet dans le tableau vertices (comparaison de pointeurs) */
-static int vertexIndex(Graph* g, Vertex* v) {
-    for (int i = 0; i < g->nbv; i++) {
-        if (g->vertices[i] == v) return i;
-    }
-    return -1;
+int vertexIndex(Graph* g, Vertex* v) {
+    (void) g;   // pour éviter un avertissement "unused parameter"
+    if (v == NULL) return -1;
+    return v->id;
 }
 
 int addEdge(Graph* g, Edge* e) {
@@ -163,7 +128,7 @@ int addEdge(Graph* g, Edge* e) {
 /* ---------- Suppression ---------- */
 
 /* Supprime une arête à partir de son pointeur (fonction interne) */
-static void removeEdgePtr(Graph* g, Edge* e) {
+void removeEdgePtr(Graph* g, Edge* e) {
     int i1 = vertexIndex(g, e->endpoints[0]);
     int i2 = vertexIndex(g, e->endpoints[1]);
 
@@ -235,6 +200,12 @@ void deleteVertex(Graph* g, Vertex v) {
     g->adj[g->nbv - 1].edges = NULL;
     g->adj[g->nbv - 1].size = 0;
     g->adj[g->nbv - 1].capacity = 0;
+
+    
+    for (int j = idx; j < g->nbv - 1; j++) {
+        g->vertices[j]->id = j;      // remet l'id en accord avec l'index
+    }
+
     g->nbv--;
 }
 
@@ -429,14 +400,14 @@ int countTriangle(Graph* g) {
 #include <string.h>
 
 /* Retourne l’indice de base d’un sommet (le premier entier après la lettre) */
-static int getBaseIndex(const char* name) {
+int getBaseIndex(const char* name) {
     int idx = 0;
     sscanf(name, "%*c%d", &idx);  // saute le premier caractère (s ou m)
     return idx;
 }
 
 /* Retourne le suffixe d’un sommet (0,1,2,3 pour m*_j ; 0,1,2 pour s*_j ; -1 si pas de suffixe) */
-static int getSuffix(const char* name) {
+int getSuffix(const char* name) {
     const char* underscore = strchr(name, '_');
     if (underscore) {
         int suf = 0;
@@ -449,7 +420,7 @@ static int getSuffix(const char* name) {
 /* Détermine un identifiant de groupe pour le rank=same.
    L’ordre souhaité (bas → haut) : s simples, m_0, m_1, m_2, m_3, s_0, s_1, s_2, ...
    On retourne un entier représentant la priorité (plus petit = plus bas). */
-static int getRankGroup(Vertex* v) {
+int getRankGroup(Vertex* v) {
     const char* name = v->name;
     if (name[0] == 's' && !strchr(name, '_'))
         return 0;                      // s2, s4, … tout en bas
@@ -461,12 +432,22 @@ static int getRankGroup(Vertex* v) {
 }
 
 /* Comparaison pour trier les sommets d’un même groupe par ordre alphabétique (optionnel) */
-static int compareVertexName(const void* a, const void* b) {
+int compareVertexName(const void* a, const void* b) {
     Vertex* va = *(Vertex**)a;
     Vertex* vb = *(Vertex**)b;
     return strcmp(va->name, vb->name);
 }
-
+// Tri par ordre de hauteur (suffixe ou type) pour aligner du bas vers le haut
+// On définit un ordre : s simple (sans suffixe) < s_0 < s_1 < s_2 ; m_0 < m_1 < m_2 < m_3
+int vertexOrder(const void* a, const void* b) {
+    Vertex* va = *(Vertex**)a;
+    Vertex* vb = *(Vertex**)b;
+    int rankA = getRankGroup(va);
+    int rankB = getRankGroup(vb);
+    if (rankA != rankB) return rankA - rankB;  // du plus bas au plus haut
+    // En cas d'égalité (ne devrait pas arriver dans une même colonne), ordre alphabétique
+    return strcmp(va->name, vb->name);
+}
 /**
  * Génère un fichier DOT avec :
  * - rangs automatiques selon le type du sommet,
@@ -556,17 +537,7 @@ void generateDotFile(Graph* g, const char* filename) {
         }
     }
 
-    // Tri par ordre de hauteur (suffixe ou type) pour aligner du bas vers le haut
-    // On définit un ordre : s simple (sans suffixe) < s_0 < s_1 < s_2 ; m_0 < m_1 < m_2 < m_3
-    auto int vertexOrder(const void* a, const void* b) {
-        Vertex* va = *(Vertex**)a;
-        Vertex* vb = *(Vertex**)b;
-        int rankA = getRankGroup(va);
-        int rankB = getRankGroup(vb);
-        if (rankA != rankB) return rankA - rankB;  // du plus bas au plus haut
-        // En cas d'égalité (ne devrait pas arriver dans une même colonne), ordre alphabétique
-        return strcmp(va->name, vb->name);
-    }
+    
 
     for (int base = 0; base < MAX_BASE; base++) {
         if (baseCount[base] <= 1) continue;
@@ -605,7 +576,7 @@ bool edgeExists(Graph* g, Vertex* v1, Vertex* v2) {
  * Renvoie true si a et b ont au moins un voisin commun dont le nom commence par 's'.
  * Utilise les listes d'adjacence du graphe.
  */
-static bool shareCommonS(Graph* g, Vertex* a, Vertex* b) {
+ bool shareCommonS(Graph* g, Vertex* a, Vertex* b) {
     // Retrouver l'indice des sommets dans g->vertices
     int idxA = -1, idxB = -1;
     for (int i = 0; i < g->nbv; i++) {
@@ -1016,5 +987,5 @@ Graph* PathOfTriangle(int path, int core, int maxPerBox, int maxLR) {
     int nbTrianglesFinaux =countTriangle( g);
     printf("NOMBRE DE TRIANGLES INITIAUX:%d. NOMBRE DE TRIANGLES FINAUX: %d\n",nbTriangles,nbTrianglesFinaux);
 
-    return gSimple;
+    return g;
 }

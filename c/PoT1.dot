@@ -1,0 +1,29 @@
+graph "PoT" {
+	layout=dot;
+	rankdir=TB;
+	splines=false;
+	newrank=true;
+	{ rank=same; s2n; s4; s6n; }
+	{ rank=same; m3_0; m5_0; }
+
+	s2n [shape=circle];
+	s4 [shape=circle];
+	s6n [shape=circle];
+	m3_0 [shape=circle];
+	m5_0 [shape=circle];
+	l3_0 [shape=circle];
+	r1_0 [shape=circle];
+
+	s2n -- s4;
+	m3_0 -- s2n;
+	m3_0 -- s4;
+	s4 -- s6n;
+	m5_0 -- s4;
+	m5_0 -- s6n;
+	l3_0 -- s2n;
+	r1_0 -- s2n;
+	l3_0 -- r1_0;
+
+	// Contraintes d'alignement vertical par groupe
+	l3_0 -- m3_0 [style=invis];
+}

@@ -2,20 +2,21 @@
 #define GRAPH_H
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 
 #define BUFFER_SIZE 256
 
 /* ---------- Structures de données ---------- */
 
+// Dans Graph.h, modifier la structure Vertex
 typedef struct _vertex {
     char* name;
-    int label;
+    int id;      // indice dans le tableau g->vertices
 } Vertex;
 
 typedef struct _edge {
     char* name;
-    int label;
     Vertex* endpoints[2];   // les deux sommets incidents
 } Edge;
 
@@ -46,8 +47,8 @@ typedef struct {
 
 /* ---------- Création des éléments ---------- */
 
-Vertex* createVertex(char* name, int label);
-Edge* createEdge(char* name, int label, Vertex* v1, Vertex* v2);
+Vertex* createVertex(char* name);
+Edge* createEdge(char* name, Vertex* v1, Vertex* v2);
 Graph* createGraph(char* name, int nbvMAX);
 
 /* ---------- Recherche ---------- */
@@ -76,6 +77,16 @@ void printEdge(Edge* e);
 void printGraph(Graph* g);
 
 int countTriangle(Graph* g);
+
+int getBaseIndex(const char* name);
+int getSuffix(const char* name);
+
+int vertexIndex(Graph* g, Vertex* v) ;
+void removeEdgePtr(Graph* g, Edge* e);
+
+int getRankGroup(Vertex* v);
+int compareVertexName(const void* a, const void* b);
+ bool shareCommonS(Graph* g, Vertex* a, Vertex* b);
 
 /* ---------- Clonage et libération ---------- */
 
