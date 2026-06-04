@@ -421,7 +421,7 @@ static int* checkProperties(Graph* g, PoTStructure* ps) {
 /* ---------- Fonction publique ---------- */
 int* checkPathOfTriangleProperties(Graph* g) {
     PoTStructure ps;
-    if (!buildPoTStructure(g, &ps,1)) {
+    if (!buildPoTStructure(g, &ps,0)) {
         // La structure de base n'est pas valide -> toutes les propriétés fausses
         int* ok = malloc(7 * sizeof(int));
         if (ok) {

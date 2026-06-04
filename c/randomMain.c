@@ -13,11 +13,11 @@
 int main(){
     srand(time(NULL));
 
-    int path=5;
+    int path=30;
     
     int count[6]={0,0,0,0,0,0};
-    for (int i=0;i<1;i++){
-        Graph* g=PathOfTriangle(path,1,3,3);
+    for (int i=0;i<20;i++){
+        Graph* g=PathOfTriangle(path,0,10,10);
         int* check = checkPathOfTriangleProperties(g);
         printList(check,7);
         free(check);

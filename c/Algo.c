@@ -80,7 +80,6 @@ Vertex** selectOneVertexPerIndex(Graph* g, int path) {
     return repr;
 }
 
-/* ---------------- Fonctions internes (static) ---------------- */
 
 
 bool isVertexInList(Vertex* v, VertexCell* list) {
@@ -106,7 +105,6 @@ bool isVertexInList(Vertex* v, VertexCell* list) {
 
 
 
-/* ---------------- Deuxième version de findTwoConnectedNeighbors ---------------- */
  bool findTwoConnectedNeighbors(Graph* g, Vertex* xi, bool* isR,
                                       Vertex** x, Vertex** y) {
     int xi_idx = vertexIndex(g, xi);
@@ -209,7 +207,7 @@ void buildMatchingLists(Graph* gprime, Pair** M, VertexCell** S) {
     int* match = malloc(n * sizeof(int));
     if (!match) return;
 
-    int size = maximumMatchingBad(gprime, match);
+    int size = maximumMatching(gprime, match);
     printf("Couplage maximum trouvé : %d arêtes\n", size);
 
     *M = NULL;

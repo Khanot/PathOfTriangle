@@ -12,6 +12,8 @@ typedef struct {
     int* used;           // marqueur BFS
     int* lca_mark;       // marqueur pour le LCA
     int  lca_timer;
+    int* blossom_mark;   // tableau de marquage pour les bases pendant la contraction
+    int blossom_timer;   // compteur pour éviter de réinitialiser blossom_mark
 } EdmondsCtx;
 
 /* ---------- Allocation / libération ---------- */
@@ -36,6 +38,7 @@ static void edmonds_free(EdmondsCtx* ctx) {
 }
 
 /* ---------- LCA ---------- */
+/* LCA classique avec marquage temporel */
 static int lca(EdmondsCtx* ctx, int a, int b) {
     ctx->lca_timer++;
     while (1) {
@@ -43,23 +46,32 @@ static int lca(EdmondsCtx* ctx, int a, int b) {
             a = ctx->base[a];
             if (ctx->lca_mark[a] == ctx->lca_timer) return a;
             ctx->lca_mark[a] = ctx->lca_timer;
-            a = (ctx->match[a] != -1) ? ctx->p[ctx->match[a]] : -1;
+            a = ctx->match[a] == -1 ? -1 : ctx->p[ctx->match[a]];
         }
         int tmp = a; a = b; b = tmp;
     }
 }
 
-/* ---------- Marquage d'un chemin vers le LCA ---------- */
+/* Marque un chemin du sommet v jusqu'au LCA (b) sans modifier les pères */
+
+/*
 static void mark_path(EdmondsCtx* ctx, int v, int b, int children) {
-    while (ctx->base[v] != b) {
+    int iter = 0;
+    while (v != -1 && ctx->base[v] != b) {
         int mv = ctx->match[v];
-        ctx->used[ctx->base[v]] = children;   // réutilise temporairement `used` pour le blossom
-        ctx->used[ctx->base[mv]] = children;
-        ctx->p[v] = mv;
-        v = ctx->p[mv];
+        if (mv == -1) break;
+        int next = ctx->p[mv];
+        if (next == -1) break;
+
+        // Marquer les bases avec le timer courant
+        ctx->blossom_mark[ctx->base[v]] = ctx->blossom_timer;
+        ctx->blossom_mark[ctx->base[mv]] = ctx->blossom_timer;
+
+        v = next;
+        if (++iter > ctx->n * 2) break;  // sécurité anti-boucle
     }
 }
-
+    */
 /* ---------- Recherche d'un chemin augmentant ---------- */
 static int find_path(EdmondsCtx* ctx, Graph* g, int root) {
     int n = ctx->n;
@@ -71,52 +83,153 @@ static int find_path(EdmondsCtx* ctx, Graph* g, int root) {
     ctx->used[root] = 1;
     ctx->q[tail++] = root;
 
+    
+
     while (head < tail) {
         int u = ctx->q[head++];
+
         AdjList* adj = &g->adj[u];
         for (int i = 0; i < adj->size; i++) {
             Edge* e = adj->edges[i];
             Vertex* vp = (e->endpoints[0] == g->vertices[u]) ? e->endpoints[1] : e->endpoints[0];
             int v = vp->id;
 
-            if (ctx->base[u] != ctx->base[v] && ctx->match[u] != v) {
-                if (v == root || (ctx->match[v] != -1 && ctx->p[ctx->match[v]] != -1)) {
-                    // blossom détecté
-                    int curbase = lca(ctx, u, v);
-                    memset(ctx->used, 0, n * sizeof(int));   // on efface les marquages précédents
-                    mark_path(ctx, u, curbase, 1);
-                    mark_path(ctx, v, curbase, 2);
 
-                    for (int i = 0; i < n; i++) {
-                        if (ctx->used[ctx->base[i]] == 1 || ctx->used[ctx->base[i]] == 2) {
-                            ctx->base[i] = curbase;
-                            if (!ctx->used[i]) {
-                                ctx->used[i] = 1;   // marque comme visité pour le BFS
-                                ctx->q[tail++] = i;
-                            }
-                        }
+            
+
+           
+            
+
+            // --- Détection de blossom ---
+            if (v == root || (ctx->match[v] != -1 && ctx->p[ctx->match[v]] != -1)) {
+                int curbase = lca(ctx, u, v);
+
+                // Allocation d'un tableau pour collecter les sommets du cycle
+                int *blossom = malloc(ctx->n * sizeof(int));
+                if (!blossom) exit(EXIT_FAILURE);
+                int blen = 0;
+
+                // --- Remonter le chemin depuis u jusqu'à curbase ---
+                int x = u;
+                while (1) {
+                    blossom[blen++] = x;               // sommet pair
+                    if (ctx->match[x] == -1) break;
+                    int mx = ctx->match[x];
+                    blossom[blen++] = mx;              // sommet impair
+                    if (ctx->base[mx] == curbase) break;
+                    x = ctx->p[mx];
+                    if (x == -1) break;
+                }
+                if (blen > 0 && blossom[blen-1] == curbase) blen--;
+
+                int blen_start = blen;
+
+                // --- Remonter le chemin depuis v jusqu'à curbase ---
+                x = v;
+                while (1) {
+                    blossom[blen++] = x;
+                    if (ctx->match[x] == -1) break;
+                    int mx = ctx->match[x];
+                    blossom[blen++] = mx;
+                    if (ctx->base[mx] == curbase) break;
+                    x = ctx->p[mx];
+                    if (x == -1) break;
+                }
+                if (blen > blen_start && blossom[blen-1] == curbase) blen--;
+
+                // --- Contracter tous les sommets vers curbase ---
+                for (int i = 0; i < blen; i++) {
+                    ctx->base[blossom[i]] = curbase;
+                }
+                ctx->base[curbase] = curbase;
+
+                // --- Orienter les parents des anciens impairs ---
+                for (int i = 1; i < blen; i += 2) {
+                    int odd = blossom[i];
+                    int even = blossom[i-1];
+                    if (ctx->p[odd] == -1) {
+                        ctx->p[odd] = even;
                     }
-                } else if (ctx->p[v] == -1) {
-                    ctx->p[v] = u;
-                    if (ctx->match[v] == -1)
-                        return v;   // sommet exposé atteint
-                    ctx->used[ctx->match[v]] = 1;
-                    ctx->q[tail++] = ctx->match[v];
+                }
+
+                // --- Enfiler les nouveaux sommets pairs ---
+                for (int i = 0; i < blen; i++) {
+                    int node = blossom[i];
+                    if (!ctx->used[node]) {
+                        ctx->used[node] = 1;
+                        ctx->q[tail++] = node;
+                    }
+                }
+                if (!ctx->used[curbase]) {
+                    ctx->used[curbase] = 1;
+                    ctx->q[tail++] = curbase;
+                }
+
+                free(blossom);
+            }
+            // --- Sommet exposé ---
+            else if (ctx->match[v] == -1) {
+                
+                ctx->p[v] = u;
+                return v;
+            }
+            // --- Progression vers le partenaire ---
+            else {
+                int w = ctx->match[v];
+                
+                if (ctx->p[w] == -1) {
+                    ctx->p[w] = u;
+                    ctx->p[v] = u;   // AJOUT IMPORTANT : parent pour l'impair
+                    if (!ctx->used[w]) {
+                        ctx->used[w] = 1;
+                        ctx->q[tail++] = w;
+                        
+                    }
                 }
             }
         }
     }
+
     return -1;
 }
-
 /* ---------- Augmentation du couplage ---------- */
 static void augment(EdmondsCtx* ctx, int v) {
+    int iter = 0;
     while (v != -1) {
+        //printf("augment iter %d : v = %d\n", iter, v);
+        if (v < 0 || v >= ctx->n) {
+            //fprintf(stderr, "augment: indice v=%d hors bornes\n", v);
+            
+        }
+
         int pv = ctx->p[v];
+        //printf("  p[%d] = %d\n", v, pv);
+        if (pv < -1 || pv >= ctx->n) {
+            //fprintf(stderr, "augment: p[%d] invalide (%d)\n", v, pv);
+            
+        }
+        if (pv == -1) {
+            //fprintf(stderr, "augment: p[%d] == -1, impossible de remonter\n", v);
+            
+        }
+
         int nv = ctx->match[pv];
+        //printf("  match[%d] = %d\n", pv, nv);
+        if (nv < -1 || nv >= ctx->n) {
+            //fprintf(stderr, "augment: match[%d] invalide (%d)\n", pv, nv);
+            
+        }
+
         ctx->match[v] = pv;
         ctx->match[pv] = v;
+        //printf("  mariage %d <-> %d\n", v, pv);
+
         v = nv;
+        iter++;
+        if (iter > ctx->n * 2) {
+            //fprintf(stderr, "augment: trop d'itérations, boucle infinie\n");
+            
+        }
     }
 }
 
@@ -130,9 +243,13 @@ int maximumMatching(Graph* g, int* out_match) {
     int res = 0;
     for (int i = 0; i < n; i++) {
         if (ctx.match[i] == -1) {
+            
             int v = find_path(&ctx, g, i);
+            
             if (v != -1) {
+                
                 augment(&ctx, v);
+                
                 res++;
             }
         }
