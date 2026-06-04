@@ -35,7 +35,7 @@ Edge* createEdge(char* name, Vertex* v1, Vertex* v2) {
 
 /**
  * Crée un graphe pouvant contenir au maximum nbvMAX sommets.
- * Le nombre maximal d'arêtes est déduit pour un graphe simple.
+ * Le nombre maximal d'arêtes est déduit pour un graphe complet.
  */
 Graph* createGraph(char* name, int nbvMAX) {
     Graph* g = malloc(sizeof(Graph));
@@ -332,7 +332,6 @@ void freeGraph(Graph* g) {
 
 /**
  * Compte le nombre de triangles dans le graphe g.
- * Complexité : O(m · d_max) en pratique, bien meilleure que l’ancienne O(m·n).
  */
 int countTriangle(Graph* g) {
     int n = g->nbv;
@@ -619,7 +618,7 @@ bool edgeExists(Graph* g, Vertex* v1, Vertex* v2) {
 }
 /* ---------- PathOfTriangle ---------- */
 Graph* PathOfTriangle(int path, int core, int maxPerBox, int maxLR) {
-    int nbVertices = 2 * maxPerBox * path + 2 * maxLR * ((path + 1) / 2);
+    int nbVertices = 2 * maxPerBox * path + 2 * maxLR * (path);
     Graph* g = createGraph("PoT", nbVertices);
     char name[BUFFER_SIZE];
 
@@ -731,6 +730,38 @@ Graph* PathOfTriangle(int path, int core, int maxPerBox, int maxLR) {
         if (!multiplied[i]) {   // sommet marqué
             int baseIdx = 2 * (i + 1);
             int nbLR = rand() % (maxLR + 1);   // 0 .. maxLR
+
+            if (path == 1) {
+                // Cas particulier : un seul sommet → au moins 2 triangles
+                nbLR = (nbLR < 2) ? 2 : nbLR;
+            } else {
+                // Premier sommet : si le voisin droit n'a pas de boîte, forcer ≥ 1
+                if (i == 0) {
+                    char buf[64];
+                    snprintf(buf, sizeof(buf), "s%d_0", baseIdx + 2);
+                    if (getVertex(g, buf) == NULL) {
+                        nbLR = (nbLR < 1) ? 1 : nbLR;
+                    }
+                }
+                // Dernier sommet : si le voisin gauche n'a pas de boîte, forcer ≥ 1
+                else if (i == path - 1) {
+                    char buf[64];
+                    snprintf(buf, sizeof(buf), "s%d_0", baseIdx - 2);
+                    if (getVertex(g, buf) == NULL) {
+                        nbLR = (nbLR < 1) ? 1 : nbLR;
+                    }
+                }
+            }
+            
+            //A verifier : conditions bizarres
+            if (nbLR > maxLR) {
+                fprintf(stderr, "Attention : nbLR=%d dépasse maxLR=%d pour le sommet %d\n",
+                        nbLR, maxLR, i);
+                // On pourrait réduire à maxLR, mais cela violerait les contraintes.
+                // Il est préférable de garantir que maxLR ≥ 2 pour path==1.
+                nbLR = maxLR;   // ou laisser la contrainte non satisfaite ?
+            }
+
             nbLR_list[i] = nbLR;
             if (nbLR > 0) {
                 L_pairs[i] = malloc(nbLR * sizeof(Vertex*));
@@ -848,51 +879,78 @@ Graph* PathOfTriangle(int path, int core, int maxPerBox, int maxLR) {
     }
 
     // ----------------------------------------------------------------------
-    // Relier les M_{i-1} et M_{i+1} s'ils n'ont pas de voisin 's' commun
+    // Relier les X_{i-1} et X_{i+1} s'ils n'ont pas de voisin 's' commun
     // ----------------------------------------------------------------------
     for (int i = 2; i <= 2 * path; i += 2) {
-        int leftIdx  = i - 1;   // indice impair à gauche
-        int rightIdx = i + 1;   // indice impair à droite
+        int leftIdx  = i - 1;   // colonne impaire gauche
+        int rightIdx = i + 1;   // colonne impaire droite
         if (leftIdx < 1 || rightIdx > 2 * path + 1) continue;
 
-        // Collecter tous les M d'indice leftIdx et rightIdx
-        Vertex** leftMs  = NULL; int cntL = 0;
-        Vertex** rightMs = NULL; int cntR = 0;
+        // ----- Collecter TOUS les sommets de la colonne gauche et de la colonne droite -----
+        Vertex** leftAll  = NULL; int cntL = 0;
+        Vertex** rightAll = NULL; int cntR = 0;
 
         for (int v = 0; v < g->nbv; v++) {
             Vertex* vert = g->vertices[v];
-            if (vert->name[0] != 'm') continue;
-            int base = getBaseIndex(vert->name);   // ex: m3_0 → 3
+            int base = getBaseIndex(vert->name);
             if (base == leftIdx) {
-                leftMs = realloc(leftMs, (cntL + 1) * sizeof(Vertex*));
-                leftMs[cntL++] = vert;
+                leftAll = realloc(leftAll, (cntL + 1) * sizeof(Vertex*));
+                leftAll[cntL++] = vert;
             } else if (base == rightIdx) {
-                rightMs = realloc(rightMs, (cntR + 1) * sizeof(Vertex*));
-                rightMs[cntR++] = vert;
+                rightAll = realloc(rightAll, (cntR + 1) * sizeof(Vertex*));
+                rightAll[cntR++] = vert;
             }
         }
 
-        // Essayer toutes les paires (gauche, droite)
+        // 1) Connexion M_{i-1} ↔ M_{i+1} 
         for (int a = 0; a < cntL; a++) {
+            if (leftAll[a]->name[0] != 'm') continue;
             for (int b = 0; b < cntR; b++) {
-                if (!edgeExists(g, leftMs[a], rightMs[b]) &&           // pas déjà reliés
-                    !shareCommonS(g, leftMs[a], rightMs[b]))           // pas de s commun
+                if (rightAll[b]->name[0] != 'm') continue;
+                if (!edgeExists(g, leftAll[a], rightAll[b]) &&
+                    !shareCommonS(g, leftAll[a], rightAll[b]))
                 {
-                    snprintf(name, BUFFER_SIZE, "e_%s_%s", leftMs[a]->name, rightMs[b]->name);
-                    addEdge(g, createEdge(name, leftMs[a], rightMs[b]));
+                    snprintf(name, BUFFER_SIZE, "e_%s_%s",
+                            leftAll[a]->name, rightAll[b]->name);
+                    addEdge(g, createEdge(name, leftAll[a], rightAll[b]));
                 }
             }
         }
-        free(leftMs);
-        free(rightMs);
+
+        // 2) L_{i-1} → tous les sommets de droite (i+1)
+        for (int a = 0; a < cntL; a++) {
+            if (leftAll[a]->name[0] != 'l') continue;
+            for (int b = 0; b < cntR; b++) {
+                if (!edgeExists(g, leftAll[a], rightAll[b])) {
+                    snprintf(name, BUFFER_SIZE, "e_%s_%s",
+                            leftAll[a]->name, rightAll[b]->name);
+                    addEdge(g, createEdge(name, leftAll[a], rightAll[b]));
+                }
+            }
+        }
+
+        // 3) R_{i+1} → tous les sommets de gauche (i-1)
+        for (int b = 0; b < cntR; b++) {
+            if (rightAll[b]->name[0] != 'r') continue;
+            for (int a = 0; a < cntL; a++) {
+                if (!edgeExists(g, rightAll[b], leftAll[a])) {
+                    snprintf(name, BUFFER_SIZE, "e_%s_%s",
+                            rightAll[b]->name, leftAll[a]->name);
+                    addEdge(g, createEdge(name, rightAll[b], leftAll[a]));
+                }
+            }
+        }
+
+        free(leftAll);
+        free(rightAll);
     }
 
     // ======================================================================
-    // 3. Relier les colonnes i et j (sommets de type s) telles que :
+    // 3. Relier les colonnes i et j telles que :
     //    j >= i+3  et  (j - i) % 3 == 2
     // ======================================================================
-    for (int i = 2; i <= 2 * path; i += 2) {
-        for (int j = i + 3; j <= 2 * path; j += 2) {   // j pair, au moins i+3
+    for (int i = 1; i <= 2 * path; i += 1) {
+        for (int j = i + 3; j <= 2 * path+1; j += 1) {   // j pair, au moins i+3
             if ((j - i) % 3 != 2) continue;            // écart ≡ 2 mod 3
 
             // Collecter tous les sommets de type s d'indice de base i et j

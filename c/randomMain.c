@@ -13,11 +13,11 @@
 int main(){
     srand(time(NULL));
 
-    int path=2;
+    int path=5;
     
     int count[6]={0,0,0,0,0,0};
-    for (int i=0;i<10;i++){
-        Graph* g=PathOfTriangle(path,1,1,1);
+    for (int i=0;i<1;i++){
+        Graph* g=PathOfTriangle(path,1,3,3);
         int* check = checkPathOfTriangleProperties(g);
         printList(check,7);
         free(check);
@@ -27,7 +27,7 @@ int main(){
 
         int j=countVertices(c.S);
         if (j<5){
-            count[i]++;
+            count[j]++;
         }
         else{
             count[5]++;

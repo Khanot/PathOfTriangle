@@ -3,13 +3,51 @@ graph "PoT_clone" {
 	rankdir=TB;
 	splines=false;
 	newrank=true;
-	{ rank=same; s4n; }
-	{ rank=same; m3_0; }
+	{ rank=same; m3_0; m7_0; }
+	{ rank=same; m7_1; m9_1; }
+	{ rank=same; m7_2; m9_2; }
+	{ rank=same; s8_0; }
+	{ rank=same; s8_1; }
 
-	s4n [shape=circle];
 	m3_0 [shape=circle];
+	m7_0 [shape=circle];
+	s8_0 [shape=circle];
+	m7_1 [shape=circle];
+	m9_1 [shape=circle];
+	s8_1 [shape=circle];
+	m7_2 [shape=circle];
+	m9_2 [shape=circle];
+	l7_0 [shape=circle];
+	r5_0 [shape=circle];
+	l11_0 [shape=circle];
+	r9_0 [shape=circle];
 
-	m3_0 -- s4n;
+	m7_1 -- s8_0;
+	m9_1 -- s8_0;
+	m7_2 -- s8_1;
+	m9_2 -- s8_1;
+	l7_0 -- r5_0;
+	l11_0 -- r9_0;
+	r5_0 -- m3_0;
+	m7_0 -- m9_1;
+	m7_0 -- m9_2;
+	m7_1 -- m9_2;
+	m7_2 -- m9_1;
+	l7_0 -- m9_1;
+	l7_0 -- m9_2;
+	l7_0 -- r9_0;
+	r9_0 -- m7_0;
+	r9_0 -- m7_1;
+	r9_0 -- m7_2;
+	m3_0 -- s8_0;
+	m3_0 -- s8_1;
+	m3_0 -- l11_0;
 
 	// Contraintes d'alignement vertical par groupe
+	l7_0 -- m7_2 [style=invis];
+	m7_2 -- m7_1 [style=invis];
+	m7_1 -- m7_0 [style=invis];
+	s8_1 -- s8_0 [style=invis];
+	r9_0 -- m9_2 [style=invis];
+	m9_2 -- m9_1 [style=invis];
 }

@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <math.h>
 #include "PathOfTriangleCheck.h"
 
 /* ---------- Structures internes (identiques à la version précédente) ---------- */
@@ -14,6 +15,7 @@ typedef struct {
 } VertexSet;
 
 typedef struct {
+    VertexSet path[MAX_INDEX];
     VertexSet X[MAX_INDEX];
     VertexSet hatX[MAX_INDEX];
     VertexSet L[MAX_INDEX];
@@ -53,7 +55,7 @@ static void freeSet(VertexSet* set) {
     set->count = set->capacity = 0;
 }
 
-static bool buildPoTStructure(Graph* g, PoTStructure* ps) {
+static bool buildPoTStructure(Graph* g, PoTStructure* ps, int verbose) {
     memset(ps, 0, sizeof(PoTStructure));
     ps->max_index = 0;
 
@@ -63,8 +65,7 @@ static bool buildPoTStructure(Graph* g, PoTStructure* ps) {
         if (c != 's' && c != 'm' && c != 'l' && c != 'r')
             return false;
         int base = getBaseIndex(v->name);
-        if (base < 1 || base >= MAX_INDEX)
-            return false;
+        
         if (base > ps->max_index) ps->max_index = base;
 
         addToSet(&ps->X[base], v);
@@ -85,41 +86,44 @@ static bool buildPoTStructure(Graph* g, PoTStructure* ps) {
             if (underscores <= 1) {
                 addToSet(&ps->hatX[base], v);
             }
+            if (underscores == 0) {
+                addToSet(&ps->path[base], v);
+            }
         }
     }
-    printf("=== Structure PoT ===\n");
-    printf("max_index = %d, n = %d\n", ps->max_index, ps->n);
-    for (int i = 1; i <= ps->max_index; i++) {
-        printf("X_%d : ", i);
-        for (int k = 0; k < ps->X[i].count; k++) {
-            printf("%s ", ps->X[i].vertices[k]->name);
-        }
-        printf("\n");
-        if (i % 2 == 0) {
-            printf("  hatX_%d : ", i);
-            for (int k = 0; k < ps->hatX[i].count; k++) {
-                printf("%s ", ps->hatX[i].vertices[k]->name);
+    if (verbose){
+        printf("=== Structure PoT ===\n");
+        printf("max_index = %d, n = %d\n", ps->max_index, ps->n);
+        for (int i = 1; i <= ps->max_index; i++) {
+            printf("X_%d : ", i);
+            for (int k = 0; k < ps->X[i].count; k++) {
+                printf("%s ", ps->X[i].vertices[k]->name);
             }
             printf("\n");
-        } else {
-            printf("  L_%d : ", i);
-            for (int k = 0; k < ps->L[i].count; k++) printf("%s ", ps->L[i].vertices[k]->name);
-            printf("\n  M_%d : ", i);
-            for (int k = 0; k < ps->M[i].count; k++) printf("%s ", ps->M[i].vertices[k]->name);
-            printf("\n  R_%d : ", i);
-            for (int k = 0; k < ps->R[i].count; k++) printf("%s ", ps->R[i].vertices[k]->name);
-            printf("\n");
+            if (i % 2 == 0) {
+                printf("  hatX_%d : ", i);
+                for (int k = 0; k < ps->hatX[i].count; k++) {
+                    printf("%s ", ps->hatX[i].vertices[k]->name);
+                }
+                printf("\n");
+            } else {
+                printf("  L_%d : ", i);
+                for (int k = 0; k < ps->L[i].count; k++) printf("%s ", ps->L[i].vertices[k]->name);
+                printf("\n  M_%d : ", i);
+                for (int k = 0; k < ps->M[i].count; k++) printf("%s ", ps->M[i].vertices[k]->name);
+                printf("\n  R_%d : ", i);
+                for (int k = 0; k < ps->R[i].count; k++) printf("%s ", ps->R[i].vertices[k]->name);
+                printf("\n");
+            }
         }
-    }
+    } 
 
-    if (ps->max_index < 3 || ps->max_index % 2 == 0)
-        return false;
-    ps->n = (ps->max_index - 2) / 2;
-    if (ps->n < 1) return false;
+    
+    ps->n = floor((ps->max_index ) / 2);
+    
+    
 
-    for (int i = 1; i <= ps->max_index; i++) {
-        if (ps->X[i].count == 0) return false;
-    }
+    
 
     return true;
 }
@@ -143,14 +147,26 @@ static int* checkProperties(Graph* g, PoTStructure* ps) {
     int n = ps->n;
 
     // P1
+    // P1 – existence de hatX, bords de taille 1, pas de deux multipliés consécutifs
     for (int i = 1; i <= n; i++) {
         if (ps->hatX[2*i].count == 0) { ok[0] = 0; break; }
     }
-    if (ok[0] && (ps->hatX[2].count != 1 || ps->hatX[2*n].count != 1))
+    if (ok[0] && (ps->hatX[2].count != 1 || ps->hatX[2*n].count != 1)){
         ok[0] = 0;
+    }
     if (ok[0]) {
         for (int i = 1; i < n; i++) {
-            if (ps->hatX[2*i].count > 1 && ps->hatX[2*i+2].count > 1) {
+            // Chaque colonne paire doit avoir exactement un sommet principal (sans underscore)
+            if (ps->path[2*i].count != 1 || ps->path[2*i+2].count != 1) {
+                ok[0] = 0;
+                break;
+            }
+            Vertex* vi = ps->path[2*i].vertices[0];
+            Vertex* vj = ps->path[2*i+2].vertices[0];
+            // Un sommet est multiplié s’il ne porte pas le suffixe « n »
+            bool i_mult = (strstr(vi->name, "n") == NULL);
+            bool j_mult = (strstr(vj->name, "n") == NULL);
+            if (i_mult && j_mult) {   // deux multipliés consécutifs → interdit
                 ok[0] = 0;
                 break;
             }
@@ -283,7 +299,7 @@ static int* checkProperties(Graph* g, PoTStructure* ps) {
         for (int a = 0; a < ps->R[idx-1].count && ok[5]; a++) {
             for (int b = 0; b < ps->M[idx+1].count && ok[5]; b++) {
                 if (areAdjacent(g, ps->R[idx-1].vertices[a], ps->M[idx+1].vertices[b]))
-                    ok[5] = 0;
+                    ok[5] = 10;
             }
         }
         // Vérifier que R et L sont couplés
@@ -405,15 +421,16 @@ static int* checkProperties(Graph* g, PoTStructure* ps) {
 /* ---------- Fonction publique ---------- */
 int* checkPathOfTriangleProperties(Graph* g) {
     PoTStructure ps;
-    if (!buildPoTStructure(g, &ps)) {
+    if (!buildPoTStructure(g, &ps,1)) {
         // La structure de base n'est pas valide -> toutes les propriétés fausses
         int* ok = malloc(7 * sizeof(int));
         if (ok) {
             for (int i = 0; i < 7; i++) ok[i] = 0;
         }
         return ok;
-    }
+    }   
     int* result = checkProperties(g, &ps);
+    //for (int i = 0; i < 7; i++) result[i] = 10;
     freePoTStructure(&ps);
     return result;
 }

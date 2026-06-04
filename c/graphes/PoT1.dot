@@ -3,22 +3,119 @@ graph "PoT" {
 	rankdir=TB;
 	splines=false;
 	newrank=true;
-	{ rank=same; s2n; s4n; }
-	{ rank=same; m3_0; }
+	{ rank=same; s10n; s2n; s4; s6n; s8; }
+	{ rank=same; m3_0; m5_0; m7_0; m9_0; }
+	{ rank=same; m7_1; m9_1; }
+	{ rank=same; m7_2; m9_2; }
+	{ rank=same; s8_0; }
+	{ rank=same; s8_1; }
 
 	s2n [shape=circle];
-	s4n [shape=circle];
+	s4 [shape=circle];
+	s6n [shape=circle];
+	s8 [shape=circle];
+	s10n [shape=circle];
 	m3_0 [shape=circle];
+	m5_0 [shape=circle];
+	m7_0 [shape=circle];
+	m9_0 [shape=circle];
+	s8_0 [shape=circle];
+	m7_1 [shape=circle];
+	m9_1 [shape=circle];
+	s8_1 [shape=circle];
+	m7_2 [shape=circle];
+	m9_2 [shape=circle];
 	l3_0 [shape=circle];
 	r1_0 [shape=circle];
+	l7_0 [shape=circle];
+	r5_0 [shape=circle];
+	l11_0 [shape=circle];
+	r9_0 [shape=circle];
 
-	s2n -- s4n;
+	s2n -- s4;
 	m3_0 -- s2n;
-	m3_0 -- s4n;
+	m3_0 -- s4;
+	s4 -- s6n;
+	m5_0 -- s4;
+	m5_0 -- s6n;
+	s6n -- s8;
+	m7_0 -- s6n;
+	m7_0 -- s8;
+	s8 -- s10n;
+	m9_0 -- s8;
+	m9_0 -- s10n;
+	s8_0 -- s6n;
+	m7_1 -- s6n;
+	m7_1 -- s8_0;
+	s8_0 -- s10n;
+	m9_1 -- s8_0;
+	m9_1 -- s10n;
+	s8_1 -- s6n;
+	m7_2 -- s6n;
+	m7_2 -- s8_1;
+	s8_1 -- s10n;
+	m9_2 -- s8_1;
+	m9_2 -- s10n;
 	l3_0 -- s2n;
 	r1_0 -- s2n;
 	l3_0 -- r1_0;
+	l7_0 -- s6n;
+	r5_0 -- s6n;
+	l7_0 -- r5_0;
+	l11_0 -- s10n;
+	r9_0 -- s10n;
+	l11_0 -- r9_0;
+	l3_0 -- m5_0;
+	l3_0 -- r5_0;
+	r5_0 -- m3_0;
+	m7_0 -- m9_1;
+	m7_0 -- m9_2;
+	m7_1 -- m9_0;
+	m7_1 -- m9_2;
+	m7_2 -- m9_0;
+	m7_2 -- m9_1;
+	l7_0 -- m9_0;
+	l7_0 -- m9_1;
+	l7_0 -- m9_2;
+	l7_0 -- r9_0;
+	r9_0 -- m7_0;
+	r9_0 -- m7_1;
+	r9_0 -- m7_2;
+	r1_0 -- s6n;
+	r1_0 -- m9_0;
+	r1_0 -- m9_1;
+	r1_0 -- m9_2;
+	r1_0 -- r9_0;
+	s2n -- m7_0;
+	s2n -- m7_1;
+	s2n -- m7_2;
+	s2n -- l7_0;
+	s2n -- s10n;
+	m3_0 -- s8;
+	m3_0 -- s8_0;
+	m3_0 -- s8_1;
+	l3_0 -- s8;
+	l3_0 -- s8_0;
+	l3_0 -- s8_1;
+	m3_0 -- l11_0;
+	l3_0 -- l11_0;
+	s4 -- m9_0;
+	s4 -- m9_1;
+	s4 -- m9_2;
+	s4 -- r9_0;
+	m5_0 -- s10n;
+	r5_0 -- s10n;
+	s6n -- l11_0;
 
 	// Contraintes d'alignement vertical par groupe
 	l3_0 -- m3_0 [style=invis];
+	r5_0 -- m5_0 [style=invis];
+	l7_0 -- m7_2 [style=invis];
+	m7_2 -- m7_1 [style=invis];
+	m7_1 -- m7_0 [style=invis];
+	s8_1 -- s8_0 [style=invis];
+	s8_0 -- s8 [style=invis];
+	r9_0 -- m9_2 [style=invis];
+	m9_2 -- m9_1 [style=invis];
+	m9_1 -- m9_0 [style=invis];
 }
