@@ -17,4 +17,9 @@ int maximumMatching(Graph* g, int* match);
 
 
 int maximumMatchingBad(Graph* g, int* match);
+
+void relinkPairs(Pair* M, Graph* ref);
+void relinkVertexCells(VertexCell* S, Graph* ref) ;
+
+
 #endif

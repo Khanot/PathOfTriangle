@@ -10,7 +10,7 @@
 #include "PathOfTriangleCHeck.h"
 
 int main(){
-    Graph* g =parsePathOfTriangle("graphes/CE22SI.dot");
+    Graph* g =parsePathOfTriangle("graphes/CE13SI.dot");
     int* check = checkPathOfTriangleProperties(g);
     printList(check,7);
     free(check);
@@ -20,13 +20,15 @@ int main(){
     
 
     CoverListNode* solutions = couvertureAll(g, path);
-    printCoverListSizes(solutions);
-    /*
-    Cover* c1= getNthCover(solutions, 44) ;
-    Cover* c2= getNthCover(solutions, 43) ;
+    //printCoverListSizes(solutions);
+    
+    Cover* c1= getNthCover(solutions, 80) ;
+    Cover* c2= getNthCover(solutions, 79) ;
     generateDotFileWithTriplets(g,"graphes/potbad.dot",c1->T);
     generateDotFileWithTriplets(g,"graphes/potgood.dot",c2->T);
-    */
+
+    generateDotFileWithPairs(g, "graphes/testpot2.dot", c2->M);
+    
     
     freeCoverList(solutions);
       

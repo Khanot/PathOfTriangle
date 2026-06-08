@@ -355,7 +355,8 @@ Cover couveture(Graph* g, int path) {
 
     buildMatchingLists(gprime, &M, &S);
 
-    
+    relinkPairs(M, g);
+    relinkVertexCells(S, g);
     sol.T = T;
     sol.M = M;
     sol.S = S;
@@ -493,7 +494,8 @@ Cover couvetureLR(Graph* g, int path) {
     VertexCell* S = NULL;
 
     buildMatchingLists(gprime, &M, &S);
-
+    relinkPairs(M, g);
+    relinkVertexCells(S, g);
     
     sol.T = T;
     sol.M = M;
@@ -628,7 +630,8 @@ Cover couvetureM(Graph* g, int path) {
     VertexCell* S = NULL;
 
     buildMatchingLists(gprime, &M, &S);
-
+    relinkPairs(M, g);
+    relinkVertexCells(S, g);
     
     sol.T = T;
     sol.M = M;
@@ -732,6 +735,8 @@ void backtrack(Graph* g, Vertex** R, int path, bool* isR,
         Pair* M = NULL;
         VertexCell* S = NULL;
         buildMatchingLists(gcopy, &M, &S);
+        relinkPairs(M, g);
+        relinkVertexCells(S, g);
         int score = countVertices(S);
         if (score > *bestScore) {
             // Libérer l'ancienne meilleure couverture
@@ -903,11 +908,13 @@ void addCoverToList(CoverListNode** list, Graph* g, Triplet* T) {
     Pair* M = NULL;
     VertexCell* S = NULL;
     buildMatchingLists(gcopy, &M, &S);
-
+    relinkPairs(M, g);
+    relinkVertexCells(S, g);
     Cover cover;
     cover.T = cloneTripletList(T);
     cover.M = M;
     cover.S = S;
+
 
     CoverListNode* node = malloc(sizeof(CoverListNode));
     node->cover = cover;

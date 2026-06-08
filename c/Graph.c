@@ -793,6 +793,140 @@ void generateDotFileWithTriplets(Graph* g, const char* filename, Triplet* T) {
     fclose(f);
     printf("Fichier DOT généré : %s\n", filename);
 }
+
+
+/**
+ * Génère un fichier DOT en colorant en rouge les arêtes qui appartiennent
+ * à la liste de paires M (le couplage). Les autres arêtes sont en noir.
+ * Seules les arêtes entre colonnes d'indices de base suffisamment proches
+ * (écart ≤ 2) sont affichées.
+ *
+ * @param g        Graphe à visualiser
+ * @param filename Nom du fichier .dot de sortie
+ * @param M        Liste chaînée de paires (couplage), peut être NULL
+ */
+void generateDotFileWithPairs(Graph* g, const char* filename, Pair* M) {
+    FILE* f = fopen(filename, "w");
+    if (!f) {
+        fprintf(stderr, "Erreur d'ouverture de %s\n", filename);
+        return;
+    }
+
+    int n = g->nbv;
+
+    // Construction d'une matrice booléenne pour marquer les arêtes du couplage
+    bool** in_matching = malloc(n * sizeof(bool*));
+    for (int i = 0; i < n; i++) {
+        in_matching[i] = calloc(n, sizeof(bool));
+    }
+    
+    // Remplir la matrice avec les paires M
+    for (Pair* p = M; p != NULL; p = p->next) {
+        int a = p->v[0]->id;
+        int b = p->v[1]->id;
+        //printf("%d,%d\n",a,b);
+        in_matching[a][b] = in_matching[b][a] = true;
+        
+    }
+    
+    // ----- En-tête du DOT -----
+    fprintf(f, "graph \"%s\" {\n", g->name);
+    fprintf(f, "\tlayout=dot;\n");
+    fprintf(f, "\trankdir=TB;\n");
+    fprintf(f, "\tsplines=false;\n");
+    fprintf(f, "\tnewrank=true;\n");
+
+    // ----- 1. Blocs rank=same (identiques à la version précédente) -----
+    #define MAX_GROUP 50
+    Vertex** groups[MAX_GROUP] = {NULL};
+    int groupSize[MAX_GROUP] = {0};
+
+    for (int i = 0; i < n; i++) {
+        int grp = getRankGroup(g->vertices[i]);
+        if (grp < 0 || grp >= MAX_GROUP) continue;
+        groups[grp] = realloc(groups[grp], (groupSize[grp] + 1) * sizeof(Vertex*));
+        groups[grp][groupSize[grp]++] = g->vertices[i];
+    }
+
+    for (int grp = 0; grp < MAX_GROUP; grp++) {
+        if (groupSize[grp] > 1)
+            qsort(groups[grp], groupSize[grp], sizeof(Vertex*), compareVertexName);
+    }
+
+    for (int grp = 0; grp < MAX_GROUP; grp++) {
+        if (groupSize[grp] == 0) continue;
+        fprintf(f, "\t{ rank=same;");
+        for (int k = 0; k < groupSize[grp]; k++) {
+            fprintf(f, " %s;", groups[grp][k]->name);
+        }
+        fprintf(f, " }\n");
+    }
+    
+    // ----- 2. Déclaration des sommets -----
+    fprintf(f, "\n");
+    for (int i = 0; i < n; i++) {
+        fprintf(f, "\t%s [shape=circle];\n", g->vertices[i]->name);
+    }
+
+    // ----- 3. Arêtes réelles avec couleur rouge si dans M -----
+    fprintf(f, "\n");
+    for (int i = 0; i < g->nbe; i++) {
+    Edge* e = g->edges[i];
+    int base1 = getBaseIndex(e->endpoints[0]->name);
+    int base2 = getBaseIndex(e->endpoints[1]->name);
+    int u = e->endpoints[0]->id;
+    int v = e->endpoints[1]->id;
+    int in_match = in_matching[u][v];   // 1 si l'arête est dans M, 0 sinon
+
+    // Afficher si l'écart est ≤ 2, OU si l'arête fait partie du matching
+    if (abs(base1 - base2) <= 2 || in_match) {
+        if (in_match) {
+            fprintf(f, "\t%s -- %s [color=red];\n",
+                    e->endpoints[0]->name, e->endpoints[1]->name);
+        } else {
+            fprintf(f, "\t%s -- %s;\n",
+                    e->endpoints[0]->name, e->endpoints[1]->name);
+        }
+    }
+}
+
+    // ----- 4. Contraintes d'alignement vertical (invisibles) -----
+    fprintf(f, "\n\t// Contraintes d'alignement vertical par groupe\n");
+
+    #define MAX_BASE 100
+    Vertex** baseLists[MAX_BASE] = {NULL};
+    int baseCount[MAX_BASE] = {0};
+
+    for (int i = 0; i < n; i++) {
+        int base = getBaseIndex(g->vertices[i]->name);
+        if (base >= 0 && base < MAX_BASE) {
+            baseLists[base] = realloc(baseLists[base], (baseCount[base] + 1) * sizeof(Vertex*));
+            baseLists[base][baseCount[base]++] = g->vertices[i];
+        }
+    }
+
+    for (int base = 0; base < MAX_BASE; base++) {
+        if (baseCount[base] <= 1) continue;
+        qsort(baseLists[base], baseCount[base], sizeof(Vertex*), vertexOrder);
+        for (int k = baseCount[base] - 1; k > 0; k--) {
+            fprintf(f, "\t%s -- %s [style=invis];\n",
+                    baseLists[base][k]->name, baseLists[base][k-1]->name);
+        }
+    }
+
+    // ----- Libération -----
+    for (int grp = 0; grp < MAX_GROUP; grp++) free(groups[grp]);
+    for (int base = 0; base < MAX_BASE; base++) free(baseLists[base]);
+
+    for (int i = 0; i < n; i++) free(in_matching[i]);
+    free(in_matching);
+
+    fprintf(f, "}\n");
+    fclose(f);
+    printf("Fichier DOT généré : %s\n", filename);
+}
+
+
 // Fonction interne : vrai si une arête existe déjà entre v1 et v2
 bool edgeExists(Graph* g, Vertex* v1, Vertex* v2) {
     for (int i = 0; i < g->nbe; i++) {

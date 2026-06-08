@@ -127,6 +127,7 @@ Graph* parsePathOfTriangle(const char* dotFilename);
 void generateDotFile(Graph* g, const char* filename);
 void generateDotFileSimplified(Graph* g, const char* filename);
 void generateDotFileWithTriplets(Graph* g, const char* filename, Triplet* T);
+void generateDotFileWithPairs(Graph* g, const char* filename, Pair* M);
 bool edgeExists(Graph* g, Vertex* v1, Vertex* v2);
 
 

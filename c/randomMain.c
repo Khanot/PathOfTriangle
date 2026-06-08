@@ -20,7 +20,7 @@ int main(){
     int count[6]={0,0,0,0,0,0};
     for (int i=0;i<100000;i++){
         path=rand()%10+10;
-        Graph* g=PathOfTriangle(path,1,15,10);
+        Graph* g=PathOfTriangle(path,0,15,10);
         int* check = checkPathOfTriangleProperties(g);
         printList(check,7);
         free(check);

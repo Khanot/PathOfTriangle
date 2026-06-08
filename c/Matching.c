@@ -348,3 +348,30 @@ int maximumMatchingBad(Graph* g, int* out_match) {
     free(cur_match); free(best_match);
     return best_size;
 }
+
+
+/**
+ * Remplace les pointeurs de sommets d’une liste de paires par les sommets
+ * de même nom dans le graphe de référence.
+ * @param M      liste de paires (modifiée en place)
+ * @param ref    graphe de référence (doit contenir les sommets nommés)
+ */
+void relinkPairs(Pair* M, Graph* ref) {
+    for (Pair* p = M; p != NULL; p = p->next) {
+        for (int i = 0; i < 2; i++) {
+            Vertex* v = getVertex(ref, p->v[i]->name);
+            if (v) p->v[i] = v;   // normalement toujours trouvé
+        }
+    }
+}
+
+/**
+ * Remplace les pointeurs de sommets d’une liste de sommets par les sommets
+ * de même nom dans le graphe de référence.
+ */
+void relinkVertexCells(VertexCell* S, Graph* ref) {
+    for (VertexCell* c = S; c != NULL; c = c->next) {
+        Vertex* v = getVertex(ref, c->v->name);
+        if (v) c->v = v;
+    }
+}
