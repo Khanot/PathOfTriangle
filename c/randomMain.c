@@ -13,25 +13,46 @@
 int main(){
     srand(time(NULL));
 
-    int path=30;
+    int path=14;
+    Cover c;
+    int j;
     
     int count[6]={0,0,0,0,0,0};
-    for (int i=0;i<20;i++){
-        Graph* g=PathOfTriangle(path,0,10,10);
+    for (int i=0;i<100000;i++){
+        path=rand()%10+10;
+        Graph* g=PathOfTriangle(path,1,15,10);
         int* check = checkPathOfTriangleProperties(g);
         printList(check,7);
         free(check);
-        generateDotFile(g,"graphes/PoT1.dot");
-    
-        Cover c=couveture(g,path);
+        
 
-        int j=countVertices(c.S);
-        if (j<5){
+
+        c=couvetureLR(g,path);
+
+        
+        j=countVertices(c.S);
+        if (j>2){
+            generateDotFileWithTriplets(g,"graphes/CE22SI.dot",c.T);
+            printf("LR,path=%d, %d sommets isolés\n",path,j);
+            exit(1);
+        }
+    
+        c=couvetureM(g,path);
+
+        
+        j=countVertices(c.S);
+        if (j>2){
+            generateDotFileWithTriplets(g,"graphes/CE22SI.dot",c.T);
+            printf("M,path=%d, %d sommets isolés\n",path,j);
+            exit(1);
+        }
+        
+        /*if (j<5){
             count[j]++;
         }
         else{
             count[5]++;
-        }
+        }*/
     }
     printList(count,6);
 

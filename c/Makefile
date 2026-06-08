@@ -1,5 +1,5 @@
 CC=gcc -g
-PROGRAMS=pot
+PROGRAMS=rm pm
 
 all: $(PROGRAMS)
 
@@ -21,10 +21,14 @@ PathOfTriangleCHeck.o: PathOfTriangleCHeck.c PathOfTriangleCHeck.h
 randomMain.o: randomMain.c
 	$(CC) -c randomMain.c -Wall
 
+parsingMain.o: parsingMain.c
+	$(CC) -c parsingMain.c -Wall
 
+rm:  Graph.o Algo.o Matching.o Utils.o PathOfTriangleCHeck.o randomMain.o 
+	$(CC)  Graph.o Algo.o Matching.o Utils.o PathOfTriangleCHeck.o randomMain.o -o rm -lm -Wall
 
-pot:  Graph.o Algo.o Matching.o Utils.o PathOfTriangleCHeck.o randomMain.o 
-	$(CC)  Graph.o Algo.o Matching.o Utils.o PathOfTriangleCHeck.o randomMain.o -o pot -lm -Wall
+pm:  Graph.o Algo.o Matching.o Utils.o PathOfTriangleCHeck.o parsingMain.o 
+	$(CC)  Graph.o Algo.o Matching.o Utils.o PathOfTriangleCHeck.o parsingMain.o -o pm -lm -Wall
 
 
 	

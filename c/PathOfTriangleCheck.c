@@ -281,10 +281,10 @@ static int* checkProperties(Graph* g, PoTStructure* ps) {
     }
 
     // P6
-    bool any_hat_one = false;
+    //bool any_hat_one = false;
     for (int i = 1; i <= n; i++) {
         if (ps->hatX[2*i].count != 1) continue;
-        any_hat_one = true;
+        //any_hat_one = true;
         int idx = 2*i;
         Vertex* hat_v = ps->hatX[idx].vertices[0];
 
@@ -293,7 +293,7 @@ static int* checkProperties(Graph* g, PoTStructure* ps) {
             for (int b = 0; b < ps->L[idx+1].count + ps->M[idx+1].count && ok[5]; b++) {
                 Vertex* v = (b < ps->L[idx+1].count) ? ps->L[idx+1].vertices[b]
                                                       : ps->M[idx+1].vertices[b - ps->L[idx+1].count];
-                if (areAdjacent(g, ps->M[idx-1].vertices[a], v)) ok[5] = 0;
+                if (areAdjacent(g, ps->M[idx-1].vertices[a], v)) ok[5] = 1000;
             }
         }
         for (int a = 0; a < ps->R[idx-1].count && ok[5]; a++) {
@@ -310,7 +310,7 @@ static int* checkProperties(Graph* g, PoTStructure* ps) {
                     if (areAdjacent(g, ps->R[idx-1].vertices[a], ps->L[idx+1].vertices[b]))
                         cnt++;
                 }
-                if (cnt != 1) ok[5] = 0;
+                if (cnt != 1) ok[5] = 20;
             }
             for (int b = 0; b < ps->L[idx+1].count; b++) {
                 int cnt = 0;
@@ -318,7 +318,7 @@ static int* checkProperties(Graph* g, PoTStructure* ps) {
                     if (areAdjacent(g, ps->R[idx-1].vertices[a], ps->L[idx+1].vertices[b]))
                         cnt++;
                 }
-                if (cnt != 1) ok[5] = 0;
+                if (cnt != 1) ok[5] = 30;
             }
         }
         // 2. Complet à l'union
@@ -329,7 +329,7 @@ static int* checkProperties(Graph* g, PoTStructure* ps) {
                 else if (k < ps->R[idx-1].count + ps->M[idx-1].count) target = ps->M[idx-1].vertices[k - ps->R[idx-1].count];
                 else if (k < ps->R[idx-1].count + ps->M[idx-1].count + ps->L[idx+1].count) target = ps->L[idx+1].vertices[k - ps->R[idx-1].count - ps->M[idx-1].count];
                 else target = ps->M[idx+1].vertices[k - ps->R[idx-1].count - ps->M[idx-1].count - ps->L[idx+1].count];
-                if (!areAdjacent(g, hat_v, target)) { ok[5] = 0; break; }
+                if (!areAdjacent(g, hat_v, target)) { ok[5] = 40; break; }
             }
         }
         // 3. Complet entre L et X_{2i+1}, X_{2i-1} et R
@@ -337,7 +337,7 @@ static int* checkProperties(Graph* g, PoTStructure* ps) {
             for (int a = 0; a < ps->L[idx-1].count; a++) {
                 for (int b = 0; b < ps->X[2*i+1].count; b++) {
                     if (!areAdjacent(g, ps->L[idx-1].vertices[a], ps->X[2*i+1].vertices[b])) {
-                        ok[5] = 0; break;
+                        ok[5] = 50; break;
                     }
                 }
             }
@@ -346,7 +346,7 @@ static int* checkProperties(Graph* g, PoTStructure* ps) {
             for (int a = 0; a < ps->X[2*i-1].count; a++) {
                 for (int b = 0; b < ps->R[idx+1].count; b++) {
                     if (!areAdjacent(g, ps->X[2*i-1].vertices[a], ps->R[idx+1].vertices[b])) {
-                        ok[5] = 0; break;
+                        ok[5] = 60; break;
                     }
                 }
             }
@@ -359,7 +359,7 @@ static int* checkProperties(Graph* g, PoTStructure* ps) {
                     if (areAdjacent(g, ps->M[idx-1].vertices[a], ps->hatX[idx-2].vertices[b]))
                         cnt++;
                 }
-                if (cnt != 1) ok[5] = 0;
+                if (cnt != 1) ok[5] = 70;
             }
             for (int b = 0; b < ps->hatX[idx-2].count; b++) {
                 int cnt = 0;
@@ -377,7 +377,7 @@ static int* checkProperties(Graph* g, PoTStructure* ps) {
                     if (areAdjacent(g, ps->M[idx+1].vertices[a], ps->hatX[idx+2].vertices[b]))
                         cnt++;
                 }
-                if (cnt != 1) ok[5] = 0;
+                if (cnt != 1) ok[5] = 90;
             }
             for (int b = 0; b < ps->hatX[idx+2].count; b++) {
                 int cnt = 0;
@@ -385,7 +385,7 @@ static int* checkProperties(Graph* g, PoTStructure* ps) {
                     if (areAdjacent(g, ps->M[idx+1].vertices[a], ps->hatX[idx+2].vertices[b]))
                         cnt++;
                 }
-                if (cnt != 1) ok[5] = 0;
+                if (cnt != 1) ok[5] = 100;
             }
         }
     }

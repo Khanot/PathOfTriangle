@@ -45,6 +45,31 @@ typedef struct {
     int size;               // nombre d'arêtes
 } IssuedEdges;
 
+
+/* ---------- Types pour l'algorithme ---------- */
+typedef struct _triplet {
+    Vertex* v[3];
+    struct _triplet* next;
+} Triplet;
+
+typedef struct _pair {
+    Vertex* v[2];
+    struct _pair* next;
+} Pair;
+
+typedef struct _vertexCell {
+    Vertex*             v;
+    struct _vertexCell* next;
+} VertexCell;
+
+typedef struct {
+    Triplet*   T;
+    Pair*      M;
+    VertexCell* S;
+} Cover;
+
+
+
 /* ---------- Création des éléments ---------- */
 
 Vertex* createVertex(char* name);
@@ -95,7 +120,13 @@ void freeGraph(Graph* g);
 
 Graph* PathOfTriangle(int path, int core, int maxPerBox, int maxLR);
 
+Graph* parsePathOfTriangle(const char* dotFilename);
+
+
+
 void generateDotFile(Graph* g, const char* filename);
+void generateDotFileSimplified(Graph* g, const char* filename);
+void generateDotFileWithTriplets(Graph* g, const char* filename, Triplet* T);
 bool edgeExists(Graph* g, Vertex* v1, Vertex* v2);
 
 

@@ -11,6 +11,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include "Graph.h"
+#include "Algo.h"
 
 #define BUFFER_SIZE 256
 
@@ -559,6 +560,239 @@ void generateDotFile(Graph* g, const char* filename) {
     fclose(f);
     printf("Fichier DOT généré : %s\n", filename);
 }
+
+
+void generateDotFileSimplified(Graph* g, const char* filename) {
+    FILE* f = fopen(filename, "w");
+    if (!f) {
+        fprintf(stderr, "Erreur d'ouverture de %s\n", filename);
+        return;
+    }
+
+    fprintf(f, "graph \"%s\" {\n", g->name);
+    fprintf(f, "\tlayout=dot;\n");
+    fprintf(f, "\trankdir=TB;\n");
+    fprintf(f, "\tsplines=false;\n");
+    fprintf(f, "\tnewrank=true;\n");
+
+    // ----------------------------------------------------------------------
+    // 1. Regrouper les sommets par groupe de rang (rank=same)
+    // ----------------------------------------------------------------------
+    #define MAX_GROUP 50
+    Vertex** groups[MAX_GROUP] = {NULL};
+    int       groupSize[MAX_GROUP] = {0};
+
+    for (int i = 0; i < g->nbv; i++) {
+        int grp = getRankGroup(g->vertices[i]);
+        if (grp < 0 || grp >= MAX_GROUP) continue;
+        groups[grp] = realloc(groups[grp], (groupSize[grp] + 1) * sizeof(Vertex*));
+        groups[grp][groupSize[grp]++] = g->vertices[i];
+    }
+
+    // Trier chaque groupe par nom pour une sortie propre
+    for (int grp = 0; grp < MAX_GROUP; grp++) {
+        if (groupSize[grp] > 1)
+            qsort(groups[grp], groupSize[grp], sizeof(Vertex*), compareVertexName);
+    }
+
+    // Écrire les blocs rank=same
+    for (int grp = 0; grp < MAX_GROUP; grp++) {
+        if (groupSize[grp] == 0) continue;
+        fprintf(f, "\t{ rank=same;");
+        for (int k = 0; k < groupSize[grp]; k++) {
+            fprintf(f, " %s;", groups[grp][k]->name);
+        }
+        fprintf(f, " }\n");
+    }
+
+    // ----------------------------------------------------------------------
+    // 2. Déclaration des sommets (shape)
+    // ----------------------------------------------------------------------
+    fprintf(f, "\n");
+    for (int i = 0; i < g->nbv; i++) {
+        fprintf(f, "\t%s [shape=circle];\n", g->vertices[i]->name);
+    }
+
+    // ----------------------------------------------------------------------
+    // 3. Arêtes réelles (uniquement entre colonnes d'indices consécutifs)
+    // ----------------------------------------------------------------------
+    fprintf(f, "\n");
+    for (int i = 0; i < g->nbe; i++) {
+        Edge* e = g->edges[i];
+        int base1 = getBaseIndex(e->endpoints[0]->name);
+        int base2 = getBaseIndex(e->endpoints[1]->name);
+        if (abs(base1 - base2) <= 2) {
+            fprintf(f, "\t%s -- %s;\n", e->endpoints[0]->name, e->endpoints[1]->name);
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // 4. Arêtes invisibles pour l’alignement vertical par colonne
+    // ----------------------------------------------------------------------
+    fprintf(f, "\n\t// Contraintes d'alignement vertical par groupe\n");
+
+    #define MAX_BASE 100
+    Vertex** baseLists[MAX_BASE] = {NULL};
+    int baseCount[MAX_BASE] = {0};
+
+    for (int i = 0; i < g->nbv; i++) {
+        int base = getBaseIndex(g->vertices[i]->name);
+        if (base >= 0 && base < MAX_BASE) {
+            baseLists[base] = realloc(baseLists[base], (baseCount[base] + 1) * sizeof(Vertex*));
+            baseLists[base][baseCount[base]++] = g->vertices[i];
+        }
+    }
+
+    for (int base = 0; base < MAX_BASE; base++) {
+        if (baseCount[base] <= 1) continue;
+        qsort(baseLists[base], baseCount[base], sizeof(Vertex*), vertexOrder);
+
+        for (int k = baseCount[base] - 1; k > 0; k--) {
+            fprintf(f, "\t%s -- %s [style=invis];\n",
+                    baseLists[base][k]->name, baseLists[base][k-1]->name);
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // Libération des tableaux temporaires
+    // ----------------------------------------------------------------------
+    for (int grp = 0; grp < MAX_GROUP; grp++) free(groups[grp]);
+    for (int base = 0; base < MAX_BASE; base++) free(baseLists[base]);
+
+    fprintf(f, "}\n");
+    fclose(f);
+    printf("Fichier DOT généré : %s\n", filename);
+}
+
+
+
+
+/**
+ * Génère un fichier .dot pour le graphe g, en colorant en rouge les arêtes
+ * qui appartiennent à au moins un triplet de la liste T.
+ * Les autres arêtes sont en noir. Seules les arêtes reliant deux colonnes
+ * d'indices consécutifs sont affichées.
+ *
+ * @param g        Graphe à visualiser
+ * @param filename Nom du fichier .dot de sortie
+ * @param T        Liste chaînée de triplets (peut être NULL)
+ */
+void generateDotFileWithTriplets(Graph* g, const char* filename, Triplet* T) {
+    FILE* f = fopen(filename, "w");
+    if (!f) {
+        fprintf(stderr, "Erreur d'ouverture de %s\n", filename);
+        return;
+    }
+
+    int n = g->nbv;
+
+    // Construction d'une matrice booléenne pour marquer les paires de triplets
+    bool** in_triplet = malloc(n * sizeof(bool*));
+    for (int i = 0; i < n; i++) {
+        in_triplet[i] = calloc(n, sizeof(bool));
+    }
+
+    // Remplir la matrice avec les triplets
+    for (Triplet* t = T; t != NULL; t = t->next) {
+        int a = t->v[0]->id;
+        int b = t->v[1]->id;
+        int c = t->v[2]->id;
+        in_triplet[a][b] = in_triplet[b][a] = true;
+        in_triplet[a][c] = in_triplet[c][a] = true;
+        in_triplet[b][c] = in_triplet[c][b] = true;
+    }
+
+    // ----- En-tête du DOT -----
+    fprintf(f, "graph \"%s\" {\n", g->name);
+    fprintf(f, "\tlayout=dot;\n");
+    fprintf(f, "\trankdir=TB;\n");
+    fprintf(f, "\tsplines=false;\n");
+    fprintf(f, "\tnewrank=true;\n");
+
+    // ----- 1. Blocs rank=same (comme avant) -----
+    #define MAX_GROUP 50
+    Vertex** groups[MAX_GROUP] = {NULL};
+    int groupSize[MAX_GROUP] = {0};
+
+    for (int i = 0; i < n; i++) {
+        int grp = getRankGroup(g->vertices[i]);
+        if (grp < 0 || grp >= MAX_GROUP) continue;
+        groups[grp] = realloc(groups[grp], (groupSize[grp] + 1) * sizeof(Vertex*));
+        groups[grp][groupSize[grp]++] = g->vertices[i];
+    }
+
+    for (int grp = 0; grp < MAX_GROUP; grp++) {
+        if (groupSize[grp] > 1)
+            qsort(groups[grp], groupSize[grp], sizeof(Vertex*), compareVertexName);
+    }
+
+    for (int grp = 0; grp < MAX_GROUP; grp++) {
+        if (groupSize[grp] == 0) continue;
+        fprintf(f, "\t{ rank=same;");
+        for (int k = 0; k < groupSize[grp]; k++) {
+            fprintf(f, " %s;", groups[grp][k]->name);
+        }
+        fprintf(f, " }\n");
+    }
+
+    // ----- 2. Déclaration des sommets -----
+    fprintf(f, "\n");
+    for (int i = 0; i < n; i++) {
+        fprintf(f, "\t%s [shape=circle];\n", g->vertices[i]->name);
+    }
+
+    // ----- 3. Arêtes réelles (indices consécutifs) avec couleur rouge si triplet -----
+    fprintf(f, "\n");
+    for (int i = 0; i < g->nbe; i++) {
+        Edge* e = g->edges[i];
+        int base1 = getBaseIndex(e->endpoints[0]->name);
+        int base2 = getBaseIndex(e->endpoints[1]->name);
+        if (abs(base1 - base2) <=2) {
+            int u = e->endpoints[0]->id;
+            int v = e->endpoints[1]->id;
+            if (in_triplet[u][v]) {
+                fprintf(f, "\t%s -- %s [color=red];\n", e->endpoints[0]->name, e->endpoints[1]->name);
+            } else {
+                fprintf(f, "\t%s -- %s;\n", e->endpoints[0]->name, e->endpoints[1]->name);
+            }
+        }
+    }
+
+    // ----- 4. Contraintes d'alignement vertical (invisibles) -----
+    fprintf(f, "\n\t// Contraintes d'alignement vertical par groupe\n");
+
+    #define MAX_BASE 100
+    Vertex** baseLists[MAX_BASE] = {NULL};
+    int baseCount[MAX_BASE] = {0};
+
+    for (int i = 0; i < n; i++) {
+        int base = getBaseIndex(g->vertices[i]->name);
+        if (base >= 0 && base < MAX_BASE) {
+            baseLists[base] = realloc(baseLists[base], (baseCount[base] + 1) * sizeof(Vertex*));
+            baseLists[base][baseCount[base]++] = g->vertices[i];
+        }
+    }
+
+    for (int base = 0; base < MAX_BASE; base++) {
+        if (baseCount[base] <= 1) continue;
+        qsort(baseLists[base], baseCount[base], sizeof(Vertex*), vertexOrder);
+        for (int k = baseCount[base] - 1; k > 0; k--) {
+            fprintf(f, "\t%s -- %s [style=invis];\n",
+                    baseLists[base][k]->name, baseLists[base][k-1]->name);
+        }
+    }
+
+    // ----- Libération -----
+    for (int grp = 0; grp < MAX_GROUP; grp++) free(groups[grp]);
+    for (int base = 0; base < MAX_BASE; base++) free(baseLists[base]);
+
+    for (int i = 0; i < n; i++) free(in_triplet[i]);
+    free(in_triplet);
+
+    fprintf(f, "}\n");
+    fclose(f);
+    printf("Fichier DOT généré : %s\n", filename);
+}
 // Fonction interne : vrai si une arête existe déjà entre v1 et v2
 bool edgeExists(Graph* g, Vertex* v1, Vertex* v2) {
     for (int i = 0; i < g->nbe; i++) {
@@ -830,7 +1064,7 @@ Graph* PathOfTriangle(int path, int core, int maxPerBox, int maxLR) {
     // ON COMPTE ICI LES TRIANGLES ET ON VERIFIERA QUE CE NOMBRE NA PAS CHANGE
 
     int nbTriangles =countTriangle(g);
-    Graph* gSimple=cloneGraph(g);
+    //Graph* gSimple=cloneGraph(g);
 
 
     // ----------------------------------------------------------------------
@@ -1044,6 +1278,176 @@ Graph* PathOfTriangle(int path, int core, int maxPerBox, int maxLR) {
 
     int nbTrianglesFinaux =countTriangle( g);
     printf("NOMBRE DE TRIANGLES INITIAUX:%d. NOMBRE DE TRIANGLES FINAUX: %d\n",nbTriangles,nbTrianglesFinaux);
+
+    return g;
+}
+
+
+/**
+ * Parse un fichier DOT (format généré par generateDotFile) et reconstruit
+ * le graphe complet du PathOfTriangle correspondant.
+ *
+ * @param dotFilename Nom du fichier .dot à lire
+ * @return Un graphe alloué dynamiquement, ou NULL en cas d'erreur.
+ */
+Graph* parsePathOfTriangle(const char* dotFilename) {
+    FILE* f = fopen(dotFilename, "r");
+    if (!f) {
+        fprintf(stderr, "Impossible d'ouvrir %s\n", dotFilename);
+        return NULL;
+    }
+
+    char line[512];
+    int nbVertices = 0, maxBase = 0;
+
+    // Première passe : compter les sommets et déterminer maxBase
+    while (fgets(line, sizeof(line), f)) {
+        if (strstr(line, "[shape=circle]")) {
+            nbVertices++;
+            char name[128];
+            if (sscanf(line, "\t%127s [", name) == 1) {
+                int base = getBaseIndex(name);
+                if (base > maxBase) maxBase = base;
+            }
+        }
+    }
+    if (nbVertices == 0 || maxBase < 2) { fclose(f); return NULL; }
+
+    Graph* g = createGraph("ParsedPoT", nbVertices);
+    rewind(f);
+
+    // Deuxième passe : ajouter les sommets
+    while (fgets(line, sizeof(line), f)) {
+        if (strstr(line, "[shape=circle]")) {
+            char name[128];
+            if (sscanf(line, "\t%127s [", name) == 1) {
+                addVertex(g, createVertex(name));
+            }
+        }
+    }
+
+    // Troisième passe : lire les arêtes existantes dans le DOT
+    rewind(f);
+    while (fgets(line, sizeof(line), f)) {
+        // Format attendu : "\t%s -- %s [éventuellement attributs];\n"
+        char v1_name[128], v2_name[128];
+        if (sscanf(line, "\t%127s -- %127s", v1_name, v2_name) == 2) {
+            // Enlever le ';' final éventuel collé à v2_name
+            char* semi = strchr(v2_name, ';');
+            if (semi) *semi = '\0';
+            // Ignorer les arêtes invisibles (style=invis)
+            if (strstr(line, "style=invis")) continue;
+
+            Vertex* v1 = getVertex(g, v1_name);
+            Vertex* v2 = getVertex(g, v2_name);
+            if (v1 && v2 && !edgeExists(g, v1, v2)) {
+                char edgeName[256];
+                snprintf(edgeName, sizeof(edgeName), "e_%s_%s", v1_name, v2_name);
+                addEdge(g, createEdge(edgeName, v1, v2));
+            }
+        }
+    }
+    fclose(f);
+
+    int path = maxBase / 2;
+
+    // Appliquer maintenant les règles pour les arêtes non présentes dans le DOT
+    // (elles n'ont pas été affichées car |base1 - base2| != 1)
+
+    // 1) Relier les M_{i-1} ↔ M_{i+1} (s'ils n'ont pas de s commun) et les L/R
+    for (int i = 2; i <= 2 * path; i += 2) {
+        int leftIdx  = i - 1;
+        int rightIdx = i + 1;
+        if (leftIdx < 1 || rightIdx > 2 * path + 1) continue;
+
+        Vertex** leftAll = NULL;  int cntL = 0;
+        Vertex** rightAll = NULL; int cntR = 0;
+        for (int v = 0; v < g->nbv; v++) {
+            Vertex* vert = g->vertices[v];
+            int base = getBaseIndex(vert->name);
+            if (base == leftIdx) {
+                leftAll = realloc(leftAll, (cntL+1)*sizeof(Vertex*));
+                leftAll[cntL++] = vert;
+            } else if (base == rightIdx) {
+                rightAll = realloc(rightAll, (cntR+1)*sizeof(Vertex*));
+                rightAll[cntR++] = vert;
+            }
+        }
+
+        // a) M ↔ M (sans voisin s commun)
+        for (int a = 0; a < cntL; a++) {
+            if (leftAll[a]->name[0] != 'm') continue;
+            for (int b = 0; b < cntR; b++) {
+                if (rightAll[b]->name[0] != 'm') continue;
+                if (!edgeExists(g, leftAll[a], rightAll[b]) &&
+                    !shareCommonS(g, leftAll[a], rightAll[b])) {
+                    char buf[256];
+                    snprintf(buf, sizeof(buf), "e_%s_%s",
+                             leftAll[a]->name, rightAll[b]->name);
+                    addEdge(g, createEdge(buf, leftAll[a], rightAll[b]));
+                }
+            }
+        }
+
+        // b) L_{i-1} → tous les sommets de droite
+        for (int a = 0; a < cntL; a++) {
+            if (leftAll[a]->name[0] != 'l') continue;
+            for (int b = 0; b < cntR; b++) {
+                if (!edgeExists(g, leftAll[a], rightAll[b])) {
+                    char buf[256];
+                    snprintf(buf, sizeof(buf), "e_%s_%s",
+                             leftAll[a]->name, rightAll[b]->name);
+                    addEdge(g, createEdge(buf, leftAll[a], rightAll[b]));
+                }
+            }
+        }
+
+        // c) R_{i+1} → tous les sommets de gauche
+        for (int b = 0; b < cntR; b++) {
+            if (rightAll[b]->name[0] != 'r') continue;
+            for (int a = 0; a < cntL; a++) {
+                if (!edgeExists(g, rightAll[b], leftAll[a])) {
+                    char buf[256];
+                    snprintf(buf, sizeof(buf), "e_%s_%s",
+                             rightAll[b]->name, leftAll[a]->name);
+                    addEdge(g, createEdge(buf, rightAll[b], leftAll[a]));
+                }
+            }
+        }
+
+        free(leftAll); free(rightAll);
+    }
+
+    // 2) Arêtes entre colonnes i et j (j ≥ i+3, (j-i)%3 == 2)
+    for (int i = 1; i <= 2 * path + 1; i++) {
+        for (int j = i + 3; j <= 2 * path + 1; j++) {
+            if ((j - i) % 3 != 2) continue;
+            Vertex** col_i = NULL; int cnt_i = 0;
+            Vertex** col_j = NULL; int cnt_j = 0;
+            for (int v = 0; v < g->nbv; v++) {
+                Vertex* vert = g->vertices[v];
+                int base = getBaseIndex(vert->name);
+                if (base == i) {
+                    col_i = realloc(col_i, (cnt_i+1)*sizeof(Vertex*));
+                    col_i[cnt_i++] = vert;
+                } else if (base == j) {
+                    col_j = realloc(col_j, (cnt_j+1)*sizeof(Vertex*));
+                    col_j[cnt_j++] = vert;
+                }
+            }
+            for (int a = 0; a < cnt_i; a++) {
+                for (int b = 0; b < cnt_j; b++) {
+                    if (!edgeExists(g, col_i[a], col_j[b])) {
+                        char buf[256];
+                        snprintf(buf, sizeof(buf), "e_%s_%s",
+                                 col_i[a]->name, col_j[b]->name);
+                        addEdge(g, createEdge(buf, col_i[a], col_j[b]));
+                    }
+                }
+            }
+            free(col_i); free(col_j);
+        }
+    }
 
     return g;
 }
