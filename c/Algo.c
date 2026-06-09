@@ -42,7 +42,13 @@ int countVertices(VertexCell* list) {
     }
     return count;
 }
-
+/**
+ * Retourne le nombre de sommets isolés dans une couverture.
+ */
+int countIsolatedVertices(Cover* c) {
+    if (!c) return 0;
+    return countVertices(c->S);
+}
 /**
  * Affiche les tailles [T,P,V] de chaque couverture contenue dans la liste.
  * T = nombre de triplets, P = nombre de paires du couplage, V = nombre d'isolés.
@@ -1066,4 +1072,320 @@ Cover* getNthCover(CoverListNode* list, int n) {
         i++;
     }
     return NULL;
+}
+
+/**
+ * Affiche les noms de tous les sommets isolés (S) d'une couverture.
+ */
+void printIsolatedVertices(Cover* cover) {
+    if (!cover) return;
+    printf("Sommets isolés : ");
+    VertexCell* cur = cover->S;
+    if (!cur) {
+        printf("aucun\n");
+        return;
+    }
+    while (cur) {
+        printf("%s ", cur->v->name);
+        cur = cur->next;
+    }
+    printf("\n");
+}
+
+
+
+
+/* ---------------- couveture ---------------- */
+Cover couvetureManuelle(Graph* g, int path) {
+    Cover sol = {NULL, NULL, NULL};
+
+    Vertex** R = selectOneVertexPerIndex(g, path);
+    if (!R) return sol;
+
+    int n = g->nbv;
+    bool* isR = calloc(n, sizeof(bool));
+    bool* used_xi = calloc(path, sizeof(bool));
+    if (!isR || !used_xi) {
+        free(R); free(isR); free(used_xi);
+        return sol;
+    }
+    for (int i = 0; i < path; i++) {
+        if (R[i]) {
+            int idx = vertexIndex(g, R[i]);
+            if (idx != -1) isR[idx] = true;
+        }
+    }
+
+    Triplet* T = NULL;
+
+    for (int i = 0; i < path; i++) {
+        if (!R[i] || used_xi[i]) continue;
+
+        Vertex* xi = R[i];
+        Vertex *x, *y;
+
+        if (findTwoConnectedNeighbors(g, xi, isR, &x, &y)) {
+            Triplet* trip = malloc(sizeof(Triplet));
+            if (!trip) break;
+            trip->v[0] = xi;
+            trip->v[1] = x;
+            trip->v[2] = y;
+            trip->next = T;
+            T = trip;
+
+            used_xi[i] = true;
+        } else {
+            if (i + 1 < path && R[i+1] && !used_xi[i+1]) {
+                Vertex* xi_next = R[i+1];
+                Vertex* y = findCommonNeighbor(g, xi, xi_next);
+                if (y != NULL) {
+                    Triplet* trip = malloc(sizeof(Triplet));
+                    if (!trip) break;
+                    trip->v[0] = xi;
+                    trip->v[1] = xi_next;
+                    trip->v[2] = y;
+                    trip->next = T;
+                    T = trip;
+
+                    used_xi[i] = true;
+                    used_xi[i+1] = true;
+                }
+            }
+        }
+    }
+    
+    Graph* gprime = cloneGraph(g);
+
+    gprime = removeVerticesFromTriplets(gprime, T);  
+    //generateDotFile(gprime, "graphes/test.dot");
+    //printf("NOMBRE DE TRIANGLES APRES RETIRER LES TRIANGLES: %d\n", countTriangle(gprime));
+    
+
+    Pair* M = NULL;
+    VertexCell* S = NULL;
+
+    buildMatchingListsManuelle(gprime, &M, &S, path);
+
+    relinkPairs(M, g);
+    relinkVertexCells(S, g);
+    sol.T = T;
+    sol.M = M;
+    sol.S = S;
+   
+    freeGraph(gprime); 
+    free(R);
+    free(isR);
+    free(used_xi);
+    
+    return sol;
+}
+void buildMatchingListsManuelle(Graph* gprime, Pair** M, VertexCell** S, int path) {
+    int n_prime = gprime->nbv;
+    bool* used_in_M = calloc(n_prime, sizeof(bool));
+    if (!used_in_M) return;
+
+    // Initialiser les listes de sortie
+    *M = NULL;
+    *S = NULL;
+
+    // ---------- Règle 1 : coupler r_i avec l_{i+2} ----------
+    for (int v = 0; v < n_prime; v++) {
+        Vertex* vert = gprime->vertices[v];
+        if (vert->name[0] != 'r') continue;
+        if (used_in_M[vert->id]) continue;
+
+        int base_r = getBaseIndex(vert->name);
+        int target_base = base_r + 2;
+
+        Vertex* l_vert = NULL;
+        for (int w = 0; w < n_prime; w++) {
+            Vertex* cand = gprime->vertices[w];
+            if (cand->name[0] != 'l') continue;
+            if (used_in_M[cand->id]) continue;
+            if (getBaseIndex(cand->name) == target_base) {
+                l_vert = cand;
+                break;
+            }
+        }
+
+        if (l_vert) {
+            Pair* pair = malloc(sizeof(Pair));
+            pair->v[0] = vert;
+            pair->v[1] = l_vert;
+            pair->next = *M;
+            *M = pair;
+            used_in_M[vert->id] = used_in_M[l_vert->id] = true;
+        } else {
+            fprintf(stderr, "Attention : aucun 'l' d'indice %d pour %s\n",
+                    target_base, vert->name);
+        }
+    }
+
+    // ---------- Étape 2 : traitement des colonnes paires ----------
+    for (int i = 2; i <= 2 * path; i += 2) {
+        int total = 0;
+        for (int v = 0; v < n_prime; v++) {
+            Vertex* vert = gprime->vertices[v];
+            if (used_in_M[vert->id]) continue;
+            int base = getBaseIndex(vert->name);
+            char c = vert->name[0];
+            if (c == 's' && base == i) {
+                int underscores = 0;
+                for (const char* p = vert->name; *p; p++) if (*p == '_') underscores++;
+                if (underscores == 1) total++;
+            } else if (c == 'm' && (base == i - 1 || base == i + 1)) {
+                total++;
+            }
+        }
+
+        // b) Vérifier l'existence de m_{i-1}_0 et m_{i+1}_0
+        Vertex* m_left0 = NULL;
+        Vertex* m_right0 = NULL;
+        for (int v = 0; v < n_prime; v++) {
+            Vertex* vert = gprime->vertices[v];
+            if (vert->name[0] == 'm') {
+                int base = getBaseIndex(vert->name);
+                if (base == i - 1 && strstr(vert->name, "_0") && !strstr(vert->name, "_0_"))
+                    m_left0 = vert;
+                if (base == i + 1 && strstr(vert->name, "_0") && !strstr(vert->name, "_0_"))
+                    m_right0 = vert;
+            }
+        }
+        
+
+        // c) Parité → exclure un m_0 si nécessaire
+        bool exclude_m0 = (total % 2 != 0);
+        Vertex* excluded = NULL;
+        if (exclude_m0) {
+            excluded = m_left0 ? m_left0 : m_right0;
+        }
+
+        // d) Collecter les sommets concernés
+        Vertex** selected = malloc(n_prime * sizeof(Vertex*));
+        int nb_sel = 0;
+        for (int v = 0; v < n_prime; v++) {
+            Vertex* vert = gprime->vertices[v];
+            if (used_in_M[vert->id]) continue;
+            int base = getBaseIndex(vert->name);
+            char c = vert->name[0];
+            if ((c == 's' && base == i) ||
+                (c == 'm' && (base == i - 1 || base == i + 1))) {
+                if (excluded && vert == excluded) continue;
+                selected[nb_sel++] = vert;
+            }
+        }
+
+        // e) Créer le sous-graphe gsec
+        Graph* gsec = cloneGraph(gprime);
+        char** keep_names = malloc(nb_sel * sizeof(char*));
+        for (int k = 0; k < nb_sel; k++) keep_names[k] = selected[k]->name;
+
+        for (int v = gsec->nbv - 1; v >= 0; v--) {
+            Vertex* vert = gsec->vertices[v];
+            bool keep = false;
+            for (int k = 0; k < nb_sel; k++) {
+                if (strcmp(vert->name, keep_names[k]) == 0) { keep = true; break; }
+            }
+            if (!keep) deleteVertex(gsec, *vert);
+        }
+        free(keep_names);
+        free(selected);
+
+        // f) Matching maximum sur le sous-graphe
+        int n_sec = gsec->nbv;
+        int* match_sec = malloc(n_sec * sizeof(int));
+        maximumMatching(gsec, match_sec);
+
+        Pair* temp_M = NULL;
+        bool* used_sec = calloc(n_sec, sizeof(bool));
+        for (int j = 0; j < n_sec; j++) {
+            if (used_sec[j]) continue;
+            int m = match_sec[j];
+            if (m != -1 && !used_sec[m]) {
+                Pair* p = malloc(sizeof(Pair));
+                p->v[0] = gsec->vertices[j];
+                p->v[1] = gsec->vertices[m];
+                p->next = temp_M;
+                temp_M = p;
+                used_sec[j] = used_sec[m] = true;
+            }
+        }
+        free(used_sec);
+        free(match_sec);
+
+        // g) Raccrocher les paires à gprime et les ajouter à M
+        relinkPairs(temp_M, gprime);
+        while (temp_M) {
+            Pair* p = temp_M;
+            temp_M = temp_M->next;
+            used_in_M[p->v[0]->id] = used_in_M[p->v[1]->id] = true;
+            p->next = *M;
+            *M = p;
+        }
+
+        freeGraph(gsec);
+    }
+
+    // ---------- Étape finale : apparier les m_i_0 restants ----------
+    for (int v = 0; v < n_prime; v++) {
+        Vertex* vert = gprime->vertices[v];
+        if (vert->name[0] != 'm') continue;
+        if (used_in_M[vert->id]) continue;
+
+        int base_m;
+        if (sscanf(vert->name, "m%d_0", &base_m) != 1) continue;
+
+        Vertex* partner = NULL;
+        for (int n = 0; ; n++) {
+            int target_base = base_m + 4 + 3 * n;
+            if (target_base > 2 * path + 1) break;
+            char target_name[64];
+            snprintf(target_name, sizeof(target_name), "m%d_0", target_base);
+            Vertex* cand = getVertex(gprime, target_name);
+            if (cand && !used_in_M[cand->id]) {
+                partner = cand;
+                break;
+            }
+        }
+
+        if (partner) {
+            Pair* pair = malloc(sizeof(Pair));
+            pair->v[0] = vert;
+            pair->v[1] = partner;
+            pair->next = *M;
+            *M = pair;
+            used_in_M[vert->id] = used_in_M[partner->id] = true;
+        }
+    }
+
+    // ---------- Construction de la liste S (isolés) ----------
+    for (int v = 0; v < n_prime; v++) {
+        Vertex* vert = gprime->vertices[v];  
+        if (!used_in_M[vert->id]) {
+            VertexCell* cell = malloc(sizeof(VertexCell));
+            cell->v = gprime->vertices[v];
+            cell->next = *S;
+            *S = cell;
+        }
+    }
+
+    // ---------- Vérification de couverture complète ----------
+    for (int i = 0; i < n_prime; i++) {
+        Vertex* v = gprime->vertices[i];
+        bool found = false;
+
+        for (Pair* p = *M; p && !found; p = p->next)
+            if (p->v[0] == v || p->v[1] == v) found = true;
+        for (VertexCell* c = *S; c && !found; c = c->next)
+            if (c->v == v) found = true;
+
+        if (!found) {
+            VertexCell* cell = malloc(sizeof(VertexCell));
+            cell->v = v;
+            cell->next = *S;
+            *S = cell;
+        }
+    }
+
+    free(used_in_M);
 }

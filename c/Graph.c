@@ -1411,7 +1411,7 @@ Graph* PathOfTriangle(int path, int core, int maxPerBox, int maxLR) {
 
 
     int nbTrianglesFinaux =countTriangle( g);
-    printf("NOMBRE DE TRIANGLES INITIAUX:%d. NOMBRE DE TRIANGLES FINAUX: %d\n",nbTriangles,nbTrianglesFinaux);
+    //printf("NOMBRE DE TRIANGLES INITIAUX:%d. NOMBRE DE TRIANGLES FINAUX: %d\n",nbTriangles,nbTrianglesFinaux);
 
     return g;
 }

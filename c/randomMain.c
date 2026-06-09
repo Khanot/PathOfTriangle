@@ -13,38 +13,28 @@
 int main(){
     srand(time(NULL));
 
-    int path=14;
+    int path=30;
     Cover c;
     int j;
     
     int count[6]={0,0,0,0,0,0};
     for (int i=0;i<100000;i++){
         path=rand()%10+10;
-        Graph* g=PathOfTriangle(path,0,15,10);
+        Graph* g=PathOfTriangle(path,1,10,10);
         int* check = checkPathOfTriangleProperties(g);
-        printList(check,7);
+        //printList(check,7);
         free(check);
         
 
-
-        c=couvetureLR(g,path);
-
-        
-        j=countVertices(c.S);
-        if (j>2){
-            generateDotFileWithTriplets(g,"graphes/CE22SI.dot",c.T);
-            printf("LR,path=%d, %d sommets isolés\n",path,j);
-            exit(1);
-        }
     
-        c=couvetureM(g,path);
+        c=couvetureManuelle(g,path);
 
         
-        j=countVertices(c.S);
-        if (j>2){
-            generateDotFileWithTriplets(g,"graphes/CE22SI.dot",c.T);
-            printf("M,path=%d, %d sommets isolés\n",path,j);
-            exit(1);
+        int s=countIsolatedVertices(&c);
+        if (s>4){
+            printIsolatedVertices(&c);
+            generateDotFileSimplified(g,"graphes/aled.dot");
+            exit(0);
         }
         
         /*if (j<5){

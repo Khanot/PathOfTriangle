@@ -22,12 +22,14 @@ int main(){
     CoverListNode* solutions = couvertureAll(g, path);
     //printCoverListSizes(solutions);
     
-    Cover* c1= getNthCover(solutions, 80) ;
+    Cover* c1= getNthCover(solutions, 44) ;
     Cover* c2= getNthCover(solutions, 79) ;
     generateDotFileWithTriplets(g,"graphes/potbad.dot",c1->T);
     generateDotFileWithTriplets(g,"graphes/potgood.dot",c2->T);
-
-    generateDotFileWithPairs(g, "graphes/testpot2.dot", c2->M);
+    for (int i=44;i<81;i+=2){
+        c1= getNthCover(solutions, i) ;
+        printIsolatedVertices(c1);
+    }
     
     
     freeCoverList(solutions);

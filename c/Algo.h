@@ -40,7 +40,7 @@
     void printTriplets(Triplet* T);
     void printVertexArray(Vertex** array, int size);
     int countVertices(VertexCell* list);
-
+    int countIsolatedVertices(Cover* c);
 
     // Sélectionne un sommet représentant par indice pair (chemin de triangles)
     Vertex** selectOneVertexPerIndex(Graph* g, int path);
@@ -129,4 +129,9 @@ void freeCoverList(CoverListNode* list);
 
 Cover* getNthCover(CoverListNode* list, int n);
 
-    #endif /* ALGO_H */
+void printIsolatedVertices(Cover* cover);
+
+Cover couvetureManuelle(Graph* g, int path);
+void buildMatchingListsManuelle(Graph* gprime, Pair** M, VertexCell** S, int path);
+
+#endif /* ALGO_H */
